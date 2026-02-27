@@ -337,7 +337,7 @@ def push_unsubscribe():
     return jsonify({"status": "ok"})
 
 
-@app.route("/api/push/send-schedule", methods=["POST"])
+@app.route("/api/push/send-schedule", methods=["GET", "POST"])
 def push_send_schedule():
     try:
         from pywebpush import webpush, WebPushException
