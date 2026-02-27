@@ -23,11 +23,17 @@ def supabase_req(method, path, body=None, params=None):
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
         "Content-Type": "application/json",
-        "Prefer": "return=minimal"
     }
+    # "return=minimal" hanya untuk write operations, bukan GET
+    if method.upper() in ("POST", "PATCH", "PUT", "DELETE"):
+        headers["Prefer"] = "return=minimal"
     try:
         resp = requests.request(method, url, headers=headers,
                                 json=body, params=params, timeout=10)
+        print(f"[Supabase] {method} {path} -> {resp.status_code}")
+        if not resp.ok:
+            print(f"[Supabase] Error body: {resp.text}")
+            return {}
         if resp.text:
             try: return resp.json()
             except: return {}
