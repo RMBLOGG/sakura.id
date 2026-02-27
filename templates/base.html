@@ -1,1 +1,98 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>{% block title %}SAKURA.ID — Nonton Anime Sub Indo{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+  <link href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
 
+<!-- NAVBAR -->
+<nav class="navbar" id="navbar">
+  <div class="nav-inner">
+    <a href="/" class="logo">
+      <span class="logo-sakura">SAKURA</span><span class="logo-dot">.</span><span class="logo-id">ID</span>
+    </a>
+
+    <ul class="nav-links" id="navLinks">
+      <li><a href="/" class="{% if active == 'home' %}active{% endif %}">Beranda</a></li>
+      <li><a href="/popular" class="{% if active == 'popular' %}active{% endif %}">Populer</a></li>
+      <li><a href="/movies" class="{% if active == 'movies' %}active{% endif %}">Movies</a></li>
+      <li><a href="/ongoing" class="{% if active == 'ongoing' %}active{% endif %}">Ongoing</a></li>
+      <li><a href="/completed" class="{% if active == 'completed' %}active{% endif %}">Completed</a></li>
+      <li><a href="/latest" class="{% if active == 'latest' %}active{% endif %}">Terbaru</a></li>
+      <li><a href="/animelist" class="{% if active == 'animelist' %}active{% endif %}">Anime List</a></li>
+      <li><a href="/genre" class="{% if active == 'genre' %}active{% endif %}">Genre</a></li>
+      <li><a href="/schedule" class="{% if active == 'schedule' %}active{% endif %}">Jadwal</a></li>
+      <li><a href="/watchlist" class="{% if active == 'watchlist' %}active{% endif %}">🔖 Watchlist</a></li>
+    </ul>
+
+    <div class="nav-right">
+      <!-- Search Bar -->
+      <div class="search-wrap" id="searchWrap">
+        <button class="search-icon-btn" id="searchToggle" aria-label="Search">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+        </button>
+        <div class="search-box" id="searchBox">
+          <input type="text" id="searchInput" placeholder="Cari anime..." autocomplete="off">
+          <div class="search-results" id="searchResults"></div>
+        </div>
+      </div>
+
+      <!-- Theme Toggle -->
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+        <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+        <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+          <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      </button>
+
+      <!-- Hamburger -->
+      <button class="hamburger" id="hamburger">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN CONTENT -->
+<main>
+  {% block content %}{% endblock %}
+</main>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-logo">
+      <span class="logo-sakura">SAKURA</span><span class="logo-dot">.</span><span class="logo-id">ID</span>
+    </div>
+    <p class="footer-tagline">Nonton Anime Sub Indo, Gratis & Berkualitas</p>
+    <nav class="footer-links">
+      <a href="/ongoing">Ongoing</a>
+      <a href="/completed">Completed</a>
+      <a href="/popular">Populer</a>
+      <a href="/movies">Movies</a>
+      <a href="/animelist">Anime List</a>
+      <a href="/genre">Genre</a>
+      <a href="/schedule">Jadwal</a>
+    </nav>
+    <p class="footer-copy">© 2026 SAKURA.ID · Powered by Dayynime</p>
+  </div>
+</footer>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/features.js') }}"></script>
+</body>
+</html>

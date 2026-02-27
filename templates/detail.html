@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}
+{{ data.detail.title if data and data.detail else 'Detail Anime' }} — SAKURA.ID
+{% endblock %}
+
+{% block content %}
+
+{% if data and data.status == 'success' and data.detail %}
+{% set d = data.detail %}
+
+<!-- Hero with blurred backdrop -->
+<div class="detail-hero">
+  <div class="detail-hero-bg" style="background-image: url('{{ d.poster }}')"></div>
+  <div class="detail-hero-overlay"></div>
+  <div class="detail-hero-content">
+    <div class="detail-poster">
+      <img src="{{ d.poster }}" alt="{{ d.title }}" onerror="this.src='/static/img/no-poster.jpg'">
+    </div>
+    <div class="detail-info">
+      <h1 class="detail-title">{{ d.title }}</h1>
+      {% if d.synonym and d.synonym != d.title %}
+      <p class="detail-synonym">{{ d.synonym }}</p>
+      {% endif %}
+
+      <div class="detail-tags">
+        {% if d.status %}
+        <span class="badge {% if d.status == 'Ongoing' %}badge-red{% else %}badge-green{% endif %}">
+          {{ d.status }}
+        </span>
+        {% endif %}
+        {% if d.type %}<span class="badge badge-dark">{{ d.type }}</span>{% endif %}
+        {% if d.duration %}<span class="badge badge-dark">{{ d.duration }}</span>{% endif %}
+        {% if d.rating and d.rating != 'N/A' %}
+        <span class="badge badge-dark">⭐ {{ d.rating }}</span>
+        {% endif %}
+      </div>
+
+      <div class="detail-actions">
+        {% if d.episodes %}
+        <a href="/watch/{{ d.episodes[0].slug }}" class="btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          Mulai Tonton
+        </a>
+        {% endif %}
+        {% if d.trailer %}
+        <a href="{{ d.trailer }}" target="_blank" rel="noopener" class="btn-secondary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+          Trailer
+        </a>
+        {% endif %}
+        <button id="watchlistBtn" class="btn-watchlist"
+          data-slug="{{ d.slug or slug }}"
+          data-title="{{ d.title }}"
+          data-poster="{{ d.poster }}"
+          data-type="{{ d.type or '' }}"
+          data-status="{{ d.status or '' }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+          Simpan
+        </button>
+        <button id="notifBtn" class="btn-notif"
+          data-slug="{{ d.slug or slug }}"
+          data-title="{{ d.title }}"
+          data-poster="{{ d.poster }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>
+          Ingatkan Saya
+        </button>
+      </div>
+
+      <div class="detail-stats">
+        {% if d.aired %}<div class="stat-item"><label>Tayang</label><span>{{ d.aired }}</span></div>{% endif %}
+        {% if d.season %}<div class="stat-item"><label>Musim</label><span>{{ d.season }}</span></div>{% endif %}
+        {% if d.studio %}<div class="stat-item"><label>Studio</label><span>{{ d.studio }}</span></div>{% endif %}
+        {% if d.author %}<div class="stat-item"><label>Author</label><span>{{ d.author }}</span></div>{% endif %}
+        {% if d.episodes %}<div class="stat-item"><label>Episode</label><span>{{ d.episodes|length }}</span></div>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Body -->
+<div class="detail-body">
+  <div class="detail-main">
+    <!-- Synopsis -->
+    {% if d.synopsis %}
+    <div>
+      <h2 class="detail-synopsis-title">Sinopsis</h2>
+      <p class="detail-synopsis-text">{{ d.synopsis }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Genres -->
+    {% if d.genres %}
+    <div class="detail-genres">
+      {% for genre in d.genres %}
+      <a href="/genre/{{ genre.slug }}" class="detail-genre-tag">{{ genre.name }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Trailer Embed -->
+    {% if d.trailer %}
+    <div class="detail-trailer" style="margin-top:2rem">
+      <h2 class="detail-synopsis-title">Trailer</h2>
+      <iframe src="{{ d.trailer }}" allowfullscreen loading="lazy"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
+      </iframe>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Episode Sidebar -->
+  <div class="episode-sidebar">
+    <h2 class="episodes-title">Daftar Episode</h2>
+    {% if d.episodes %}
+    <input type="text" id="episodeSearch" class="episode-search" placeholder="Cari episode...">
+    <div class="episode-list">
+      {% for ep in d.episodes %}
+      <a href="/watch/{{ ep.slug }}" class="episode-item">{{ ep.name }}</a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding:2rem 0">
+      <p>Belum ada episode tersedia</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% else %}
+<div class="page-wrap">
+  <div class="error-msg">
+    Gagal memuat detail anime.
+    {% if data and data.message %}Error: {{ data.message }}{% endif %}
+  </div>
+  <a href="/" class="btn-secondary" style="display:inline-flex; margin-top:1rem">← Kembali ke Beranda</a>
+</div>
+{% endif %}
+
+{% endblock %}

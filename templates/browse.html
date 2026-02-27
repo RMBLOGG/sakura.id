@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — SAKURA.ID{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="page-header">
+    <h1 class="page-title"><span>{{ title }}</span></h1>
+    {% if data and data.pagination %}
+    <p style="color:var(--text3); font-size:0.85rem; margin-top:0.4rem;">Halaman {{ page }}</p>
+    {% endif %}
+  </div>
+
+  {% if data and data.status == 'success' %}
+
+  <div class="anime-grid">
+    {% for anime in data.animes %}
+    <a href="/anime/{{ anime.slug }}" class="grid-card">
+      <div class="grid-card-poster-wrap">
+        <img class="grid-card-poster" src="{{ anime.poster }}" alt="{{ anime.title }}" loading="lazy"
+             onerror="this.src='/static/img/no-poster.jpg'">
+        <div class="grid-card-badges">
+          {% if anime.type %}
+          <span class="badge badge-red">{{ anime.type }}</span>
+          {% endif %}
+          {% if anime.status_or_day and 'Selesai' in anime.status_or_day %}
+          <span class="badge badge-green">Selesai</span>
+          {% endif %}
+        </div>
+        <div class="grid-card-hover">
+          <span class="badge badge-dark" style="font-size:0.65rem">▶ Tonton</span>
+        </div>
+      </div>
+      <div class="grid-card-info">
+        <div class="grid-card-title">{{ anime.title }}</div>
+        <div class="grid-card-sub">{{ anime.episode or '' }}</div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- Pagination -->
+  {% if data.pagination %}
+  {% set pag = data.pagination %}
+  <div class="pagination">
+    {% if pag.hasPrev %}
+    <a href="?page={{ page - 1 }}">← Prev</a>
+    {% else %}
+    <span class="disabled">← Prev</span>
+    {% endif %}
+
+    {% if page > 2 %}
+    <a href="?page=1">1</a>
+    {% endif %}
+    {% if page > 3 %}<span>…</span>{% endif %}
+    {% if page > 1 %}<a href="?page={{ page - 1 }}">{{ page - 1 }}</a>{% endif %}
+    <span class="current">{{ page }}</span>
+    {% if pag.hasNext %}<a href="?page={{ page + 1 }}">{{ page + 1 }}</a>{% endif %}
+
+    {% if pag.hasNext %}
+    <a href="?page={{ page + 1 }}">Next →</a>
+    {% else %}
+    <span class="disabled">Next →</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% elif data and data.status == 'error' %}
+  <div class="error-msg">Error: {{ data.message }}</div>
+  {% else %}
+  <div class="empty-state">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+    <p>Tidak ada data tersedia</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

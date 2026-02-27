@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Daftar Anime — SAKURA.ID{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="page-header">
+    <h1 class="page-title">Daftar <span>Anime</span></h1>
+    <p style="color:var(--text3); font-size:0.85rem; margin-top:0.4rem;">Halaman {{ page }}</p>
+  </div>
+
+  {% if data and data.status == 'success' %}
+
+  <div class="animelist-grid">
+    {% for anime in data.animes %}
+    <a href="/anime/{{ anime.slug }}" class="animelist-card">
+      <img src="{{ anime.poster }}" alt="{{ anime.title }}" loading="lazy"
+           onerror="this.src='/static/img/no-poster.jpg'">
+      <div class="animelist-info">
+        <div class="animelist-title">{{ anime.title }}</div>
+        {% if anime.genres %}
+        <div class="animelist-genres">
+          {% for g in anime.genres[:3] %}
+          <span class="genre-tag">{{ g }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div class="animelist-meta">
+          {% if anime.release %}{{ anime.release }} · {% endif %}
+          {% if anime.type %}{{ anime.type }} · {% endif %}
+          {% if anime.status %}
+          <span style="color: {% if anime.status == 'Ongoing' %}var(--sakura){% else %}var(--green){% endif %}">
+            {{ anime.status }}
+          </span>
+          {% endif %}
+          {% if anime.episode_count %} · {{ anime.episode_count }}{% endif %}
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- Pagination -->
+  {% if data.pagination %}
+  {% set pag = data.pagination %}
+  <div class="pagination">
+    {% if pag.hasPrev %}
+    <a href="?page={{ page - 1 }}">← Prev</a>
+    {% else %}
+    <span class="disabled">← Prev</span>
+    {% endif %}
+    {% if page > 1 %}<a href="?page={{ page - 1 }}">{{ page - 1 }}</a>{% endif %}
+    <span class="current">{{ page }}</span>
+    {% if pag.hasNext %}<a href="?page={{ page + 1 }}">{{ page + 1 }}</a>{% endif %}
+    {% if pag.hasNext %}
+    <a href="?page={{ page + 1 }}">Next →</a>
+    {% else %}
+    <span class="disabled">Next →</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="error-msg">{{ data.message if data else 'Gagal memuat data' }}</div>
+  {% endif %}
+</div>
+{% endblock %}

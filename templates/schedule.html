@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Jadwal Tayang — SAKURA.ID{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="page-header">
+    <h1 class="page-title">Jadwal <span>Tayang</span></h1>
+    <p style="color:var(--text3); font-size:0.85rem; margin-top:0.4rem;">Update terbaru jadwal rilis anime Sub Indo</p>
+  </div>
+
+  {% if data and data.status == 'success' %}
+  {% set day_order = ["senin", "selasa", "rabu", "kamis", "jum'at", "sabtu", "minggu"] %}
+  <div class="schedule-grid">
+    {% for day in day_order %}
+    {% if day in data.schedule %}
+    <div class="schedule-day">
+      <div class="schedule-day-header">{{ day | title }}</div>
+      <div class="schedule-items">
+        {% for anime in data.schedule[day] %}
+        <a href="/anime/{{ anime.slug }}" class="schedule-item">
+          <img src="{{ anime.poster }}" alt="{{ anime.title }}" loading="lazy"
+               onerror="this.src='/static/img/no-poster.jpg'">
+          <div class="schedule-item-info">
+            <div class="schedule-item-title">{{ anime.title }}</div>
+            <div class="schedule-item-ep">
+              {{ anime.episode }}
+              {% if anime.status_or_day and anime.status_or_day != '??' %}
+              · Ep {{ anime.status_or_day }}
+              {% endif %}
+            </div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    <!-- Hari yang tidak ada di day_order -->
+    {% for day, animes in data.schedule.items() %}
+    {% if day not in day_order %}
+    <div class="schedule-day">
+      <div class="schedule-day-header">{{ day | title }}</div>
+      <div class="schedule-items">
+        {% for anime in animes %}
+        <a href="/anime/{{ anime.slug }}" class="schedule-item">
+          <img src="{{ anime.poster }}" alt="{{ anime.title }}" loading="lazy"
+               onerror="this.src='/static/img/no-poster.jpg'">
+          <div class="schedule-item-info">
+            <div class="schedule-item-title">{{ anime.title }}</div>
+            <div class="schedule-item-ep">{{ anime.episode }}</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="error-msg">{{ data.message if data else 'Gagal memuat jadwal' }}</div>
+  {% endif %}
+</div>
+{% endblock %}

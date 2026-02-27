@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}
+{{ data.title if data and data.title else 'Nonton Anime' }} — SAKURA.ID
+{% endblock %}
+
+{% block content %}
+<div class="watch-wrap">
+
+  {% if data and data.status == 'success' %}
+
+  <!-- Breadcrumb -->
+  <div style="margin-bottom:1rem; font-size:0.8rem; color:var(--text3); display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+    <a href="/" style="color:var(--text3); transition:color 0.2s" onmouseover="this.style.color='var(--sakura)'" onmouseout="this.style.color='var(--text3)'">Beranda</a>
+    <span>›</span>
+    {% if anime_slug %}
+    <a href="/anime/{{ anime_slug }}" style="color:var(--text3); transition:color 0.2s" onmouseover="this.style.color='var(--sakura)'" onmouseout="this.style.color='var(--text3)'">{{ anime_title or anime_slug }}</a>
+    <span>›</span>
+    {% endif %}
+    <span style="color:var(--text)">{{ data.title }}</span>
+  </div>
+
+  <!-- Title -->
+  <h1 class="watch-title">{{ data.title }}</h1>
+
+  <!-- Meta untuk fitur history (hidden) -->
+  <div id="watchMeta" style="display:none"
+    data-anime-slug="{{ anime_slug or '' }}"
+    data-anime-title="{{ anime_title or data.title or '' }}"
+    data-anime-poster="{{ anime_poster or '' }}"
+    data-episode-slug="{{ slug }}"
+    data-episode-name="{{ data.title or '' }}">
+  </div>
+  {% if anime_poster %}
+  <img id="animePosterPreload" src="{{ anime_poster }}" alt="poster" style="display:none;width:1px;height:1px;position:absolute;" crossorigin="anonymous">
+  {% endif %}
+
+  <!-- Player -->
+  <div class="watch-player-area">
+    <div class="player-placeholder" id="playerPlaceholder">
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>
+      </svg>
+      <p>Pilih server di bawah untuk mulai streaming</p>
+    </div>
+    <iframe id="playerFrame" src="" allowfullscreen
+            allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+            style="display:none; width:100%; height:100%; border:none;"
+            referrerpolicy="no-referrer-when-downgrade">
+    </iframe>
+  </div>
+
+  <!-- Server Selector -->
+  {% if data.streams %}
+  <div class="server-selector">
+    <div class="server-label">Pilih Server & Kualitas</div>
+    <div class="server-buttons">
+      {% for stream in data.streams %}
+      <button class="server-btn" data-url="{{ stream.url }}">
+        {{ stream.name }}
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div class="error-msg" style="margin-bottom:1.5rem">Tidak ada stream tersedia untuk episode ini</div>
+  {% endif %}
+
+  <!-- Downloads -->
+  {% if data.downloads and data.downloads|length > 0 %}
+  <div style="margin-bottom:2rem;">
+    <div class="server-label">Download</div>
+    <div class="server-buttons">
+      {% for dl in data.downloads %}
+      <a href="{{ dl.url }}" target="_blank" rel="noopener" class="server-btn" style="display:inline-block">
+        ↓ {{ dl.name or dl.quality or 'Download' }}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Notice -->
+  <div style="padding:1rem; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); font-size:0.82rem; color:var(--text3); margin-bottom:2rem; line-height:1.7;">
+    <strong style="color:var(--text2)">⚠️ Catatan:</strong>
+    Jika video tidak dapat diputar, coba server lain. Beberapa server memerlukan pop-up atau redirect.
+    Gunakan browser yang mendukung pemutaran embed video.
+  </div>
+
+  <!-- Back Button -->
+  <div>
+    <button onclick="history.back()" class="btn-secondary" style="font-family:var(--font-body); cursor:pointer;">
+      ← Kembali
+    </button>
+  </div>
+
+  {% else %}
+  <div class="error-msg">
+    Gagal memuat episode.
+    {% if data and data.message %}Error: {{ data.message }}{% endif %}
+  </div>
+  <a href="/" class="btn-secondary" style="display:inline-flex; margin-top:1rem; font-family:var(--font-body)">← Beranda</a>
+  {% endif %}
+
+</div>
+{% endblock %}
