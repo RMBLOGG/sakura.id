@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for
 import requests
 import time
 import threading
+import os
 from collections import deque
 
 app = Flask(__name__)
@@ -236,6 +237,44 @@ def watch(slug):
 @app.route("/watchlist")
 def watchlist():
     return render_template("watchlist.html", active="watchlist")
+
+
+# ─── Service Worker ──────────────────────────────────────
+
+@app.route("/sw.js")
+def service_worker():
+    from flask import Response
+    response = Response(
+        open(os.path.join(app.static_folder, 'sw.js')).read(),
+        mimetype='application/javascript'
+    )
+    response.headers['Service-Worker-Allowed'] = '/'
+    response.headers['Cache-Control'] = 'no-cache'
+    return response
+
+
+# ─── API: Schedule untuk SW background check ────────────
+
+@app.route("/api/schedule-notif")
+def api_schedule_notif():
+    """Endpoint untuk Service Worker cek jadwal di background"""
+    subs_raw = request.args.get("subs", "[]")
+    try:
+        import json
+        subs = json.loads(subs_raw)
+    except Exception:
+        subs = []
+
+    schedule_data = get_cached_or_fetch(
+        f"{API_BASE}/anime/animasu/schedule",
+        "schedule",
+        cache_type='long'
+    )
+
+    return jsonify({
+        "subs": subs,
+        "schedule": schedule_data.get("data", schedule_data) if isinstance(schedule_data, dict) else {}
+    })
 
 
 # ─── AJAX Endpoints ─────────────────────────────────────
