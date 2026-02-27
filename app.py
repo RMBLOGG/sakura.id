@@ -301,7 +301,7 @@ def api_schedule_notif():
 
     return jsonify({
         "subs": subs,
-        "schedule": schedule_data.get("schedule", {}).get("schedule", schedule_data.get("schedule", {})) if isinstance(schedule_data, dict) else {}
+        "schedule": (lambda d: next((d.get(k) for k in ["schedule","data"] if isinstance(d.get(k),dict) and any(x in d.get(k) for x in ["senin","sabtu","minggu"])), d.get("schedule", d.get("data", {}))))(schedule_data) if isinstance(schedule_data, dict) else {}
     })
 
 
@@ -351,8 +351,25 @@ def push_send_schedule():
         schedule_data = get_cached_or_fetch(
             f"{API_BASE}/anime/animasu/schedule", "schedule", cache_type="long"
         )
-        raw = schedule_data.get("schedule", {}) if isinstance(schedule_data, dict) else {}
-        schedule = raw.get("schedule", raw) if isinstance(raw, dict) else {}
+        # Handle semua kemungkinan struktur API:
+        # 1. {"schedule": {"schedule": {"sabtu": [...]}}}
+        # 2. {"schedule": {"sabtu": [...]}}
+        # 3. {"data": {"sabtu": [...]}}
+        def extract_schedule(d):
+            if not isinstance(d, dict):
+                return {}
+            for key in ["schedule", "data"]:
+                val = d.get(key)
+                if isinstance(val, dict):
+                    # Cek apakah ini langsung berisi hari-hari
+                    if any(k in val for k in ["senin","selasa","rabu","kamis","jumat","sabtu","minggu"]):
+                        return val
+                    # Atau nested satu level lagi
+                    inner = val.get("schedule") or val.get("data")
+                    if isinstance(inner, dict):
+                        return inner
+            return {}
+        schedule = extract_schedule(schedule_data)
 
         today = datetime.datetime.now().strftime("%A").lower()
         day_map = {
