@@ -107,17 +107,21 @@ const Notif = {
 
   send(title, body, icon, url) {
     if (Notification.permission !== 'granted') return;
-    const n = new Notification(title, {
-      body, icon: icon || '/static/img/sakura-icon.png',
-      badge: '/static/img/sakura-icon.png',
-      tag: 'sakura-notif'
-    });
-    if (url) n.onclick = () => { window.focus(); window.location.href = url; n.close(); };
-    setTimeout(() => n.close(), 8000);
+    // Kirim lewat Service Worker kalau tersedia (agar bisa muncul di background)
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: 'SEND_NOTIF', title, body, icon, url });
+    } else {
+      const n = new Notification(title, {
+        body, icon: icon || '/static/img/sakura-icon.png',
+        badge: '/static/img/sakura-icon.png',
+        tag: 'sakura-notif'
+      });
+      if (url) n.onclick = () => { window.focus(); window.location.href = url; n.close(); };
+      setTimeout(() => n.close(), 8000);
+    }
   },
 
   // Cek jadwal dan kirim notif untuk anime yang disubscribe
-  // Dipanggil saat halaman schedule dimuat atau dari SW
   checkSchedule(scheduleData) {
     if (Notification.permission !== 'granted') return;
     const subs = this.getSubs();
@@ -139,6 +143,30 @@ const Notif = {
         }
       });
     });
+  },
+
+  // Register Service Worker untuk notifikasi background
+  async registerSW() {
+    if (!('serviceWorker' in navigator)) return;
+    try {
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      console.log('[SW] Registered:', reg.scope);
+
+      // Kirim data subs ke SW saat diminta
+      navigator.serviceWorker.addEventListener('message', e => {
+        if (e.data?.type === 'GET_SUBS_FOR_SW') {
+          const subs = this.getSubs();
+          e.source?.postMessage({ type: 'SUBS_DATA', subs });
+        }
+      });
+
+      // Minta SW mulai background check
+      navigator.serviceWorker.ready.then(sw => {
+        sw.active?.postMessage({ type: 'START_NOTIF_CHECK' });
+      });
+    } catch (err) {
+      console.log('[SW] Register failed:', err);
+    }
   }
 };
 
@@ -409,4 +437,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initWatchHistory();
   renderContinueWatching();
   renderWatchlistPage();
+  // Register Service Worker untuk notifikasi background
+  Notif.registerSW();
 });
