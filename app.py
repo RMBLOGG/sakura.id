@@ -367,13 +367,30 @@ def push_send_schedule():
         if not todays_anime:
             return jsonify({"status": "no anime today"})
 
+        # Cek anime mana yang belum dikirim notifnya hari ini
+        today_date = datetime.date.today().isoformat()
+        already_sent_raw = supabase_req("GET", "notif_sent", params={
+            "select": "anime_slug",
+            "sent_date": f"eq.{today_date}"
+        })
+        already_sent = set()
+        if isinstance(already_sent_raw, list):
+            already_sent = {r["anime_slug"] for r in already_sent_raw}
+
+        # Filter hanya anime yang belum dikirim hari ini
+        new_anime = [a for a in todays_anime if a.get("slug") not in already_sent]
+        if not new_anime:
+            return jsonify({"status": "already sent today", "sent": 0})
+
         sent = 0
         failed = 0
+        newly_sent_slugs = []
+
         for sub in subs:
-            for anime in todays_anime[:3]:
+            for anime in new_anime:
                 try:
                     payload = json.dumps({
-                        "title": f"\U0001f338 Episode Baru: {anime.get('title', '')}",
+                        "title": f"🌸 Episode Baru: {anime.get('title', '')}",
                         "body": "Tayang hari ini! Klik untuk nonton sekarang.",
                         "icon": anime.get("poster", "/static/img/sakura-icon.png"),
                         "url": f"/anime/{anime.get('slug', '')}"
@@ -388,6 +405,9 @@ def push_send_schedule():
                         vapid_claims=VAPID_CLAIMS
                     )
                     sent += 1
+                    slug = anime.get("slug")
+                    if slug and slug not in newly_sent_slugs:
+                        newly_sent_slugs.append(slug)
                 except WebPushException as e:
                     if "410" in str(e) or "404" in str(e):
                         supabase_req("DELETE", "push_subscriptions",
@@ -396,7 +416,15 @@ def push_send_schedule():
                 except Exception:
                     failed += 1
 
-        return jsonify({"status": "ok", "sent": sent, "failed": failed})
+        # Simpan anime yang sudah dikirim notifnya hari ini ke Supabase
+        for slug in newly_sent_slugs:
+            try:
+                supabase_req("POST", "notif_sent",
+                             body={"anime_slug": slug, "sent_date": today_date})
+            except Exception:
+                pass
+
+        return jsonify({"status": "ok", "sent": sent, "failed": failed, "new_anime": len(new_anime)})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
