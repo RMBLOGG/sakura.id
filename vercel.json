@@ -3,10 +3,7 @@
   "builds": [
     {
       "src": "app.py",
-      "use": "@vercel/python",
-      "config": {
-        "includeFiles": ["animasu_extension.py", "templates/**", "static/**"]
-      }
+      "use": "@vercel/python"
     },
     {
       "src": "static/**",
@@ -21,12 +18,6 @@
     {
       "src": "/(.*)",
       "dest": "/app.py"
-    }
-  ],
-  "crons": [
-    {
-      "path": "/api/push/send-schedule",
-      "schedule": "0 12 * * *"
     }
   ]
 }
