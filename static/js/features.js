@@ -145,28 +145,78 @@ const Notif = {
     });
   },
 
-  // Register Service Worker untuk notifikasi background
+  // Register Service Worker + Web Push subscription
   async registerSW() {
     if (!('serviceWorker' in navigator)) return;
     try {
       const reg = await navigator.serviceWorker.register('/sw.js');
       console.log('[SW] Registered:', reg.scope);
 
-      // Kirim data subs ke SW saat diminta
-      navigator.serviceWorker.addEventListener('message', e => {
-        if (e.data?.type === 'GET_SUBS_FOR_SW') {
-          const subs = this.getSubs();
-          e.source?.postMessage({ type: 'SUBS_DATA', subs });
-        }
-      });
-
-      // Minta SW mulai background check
-      navigator.serviceWorker.ready.then(sw => {
-        sw.active?.postMessage({ type: 'START_NOTIF_CHECK' });
-      });
+      // Kalau izin sudah granted, langsung subscribe Web Push
+      if (Notification.permission === 'granted') {
+        await this.subscribePush(reg);
+      }
     } catch (err) {
       console.log('[SW] Register failed:', err);
     }
+  },
+
+  // Subscribe Web Push ke server
+  async subscribePush(reg) {
+    try {
+      // Ambil VAPID public key dari server
+      const keyResp = await fetch('/api/push/vapid-public-key');
+      const { key } = await keyResp.json();
+      if (!key) return;
+
+      // Convert base64url ke Uint8Array
+      const appServerKey = this._urlB64ToUint8Array(key);
+
+      // Cek apakah sudah subscribe
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: appServerKey
+        });
+      }
+
+      // Kirim subscription ke server untuk disimpan di Supabase
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sub.toJSON())
+      });
+
+      console.log('[Push] Subscribed!');
+    } catch (err) {
+      console.log('[Push] Subscribe failed:', err);
+    }
+  },
+
+  // Unsubscribe Web Push
+  async unsubscribePush() {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) {
+        await fetch('/api/push/unsubscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint: sub.endpoint })
+        });
+        await sub.unsubscribe();
+      }
+    } catch (err) {
+      console.log('[Push] Unsubscribe failed:', err);
+    }
+  },
+
+  _urlB64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
   }
 };
 
@@ -231,6 +281,14 @@ function initNotifButton() {
     }
     const subbed = Notif.toggle({ slug, title, poster });
     updateBtn(subbed);
+
+    // Kalau subscribe: daftarkan Web Push ke server
+    // Kalau unsubscribe: hanya hapus dari daftar lokal (tetap terima notif global)
+    if (subbed) {
+      const reg = await navigator.serviceWorker.ready;
+      await Notif.subscribePush(reg);
+    }
+
     showToast(subbed
       ? `🔔 Notifikasi aktif untuk "${title}"`
       : `🔕 Notifikasi dimatikan untuk "${title}"`
