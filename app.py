@@ -12,7 +12,6 @@ app.secret_key = 'sakura-id-secret'
 # Supabase & Web Push Config
 SUPABASE_URL      = os.environ.get('SUPABASE_URL', '')
 SUPABASE_KEY      = os.environ.get('SUPABASE_KEY', '')
-# VAPID key disimpan dalam 2 bagian karena Vercel memotong string panjang
 VAPID_PUBLIC_KEY  = os.environ.get('VAPID_PUBLIC_KEY_1', '') + os.environ.get('VAPID_PUBLIC_KEY_2', '')
 VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
 VAPID_CLAIMS      = {"sub": "mailto:admin@sakura-id.vercel.app"}
@@ -47,9 +46,6 @@ HEADERS = {
     'Connection': 'keep-alive',
 }
 
-# ============================================================
-# CACHE SYSTEM
-# ============================================================
 cache_store = {}
 CACHE_DURATION = {
     'short':  600,
@@ -68,31 +64,23 @@ def _wait_for_rate_limit():
             _request_times.pop(0)
         if len(_request_times) >= MAX_REQUESTS_PER_MINUTE:
             wait = 60 - (now - _request_times[0]) + 0.5
-            print(f"⏳ Rate limit: tunggu {wait:.1f}s")
             time.sleep(max(wait, 0))
         _request_times.append(time.time())
 
 def get_cached_or_fetch(url, cache_key, timeout=15, cache_type='short'):
     now = time.time()
     duration = CACHE_DURATION.get(cache_type, CACHE_DURATION['short'])
-
     if cache_key in cache_store:
         cached_data, timestamp = cache_store[cache_key]
         if now - timestamp < duration:
-            print(f"✅ Cache HIT: {cache_key}")
             return cached_data
-
-    print(f"🌐 API Request: {cache_key}")
     _wait_for_rate_limit()
-
     last_error = None
     for attempt in range(3):
         try:
             response = requests.get(url, headers=HEADERS, timeout=timeout)
             if response.status_code in (403, 429):
-                wait = (attempt + 1) * 5
-                print(f"⚠️ Rate limited ({response.status_code}), retry {attempt+1}/3 dalam {wait}s")
-                time.sleep(wait)
+                time.sleep((attempt + 1) * 5)
                 continue
             response.raise_for_status()
             data = response.json()
@@ -102,11 +90,8 @@ def get_cached_or_fetch(url, cache_key, timeout=15, cache_type='short'):
             last_error = e
             if attempt < 2:
                 time.sleep(2)
-
     if cache_key in cache_store:
-        print(f"⚠️ Pakai stale cache: {cache_key}")
         return cache_store[cache_key][0]
-
     return {"status": "error", "message": str(last_error)}
 
 
@@ -121,38 +106,29 @@ def home():
     return render_template("home.html", data=data, page=page, active="home",
                            popular_data=popular_data, movies_data=movies_data)
 
-
 @app.route("/ongoing")
 def ongoing():
     page = request.args.get("page", 1, type=int)
     data = get_cached_or_fetch(f"{API_BASE}/anime/animasu/ongoing?page={page}", f"ongoing_{page}", cache_type='short')
-    return render_template("browse.html", data=data, page=page,
-                           title="Anime Ongoing", active="ongoing")
-
+    return render_template("browse.html", data=data, page=page, title="Anime Ongoing", active="ongoing")
 
 @app.route("/completed")
 def completed():
     page = request.args.get("page", 1, type=int)
     data = get_cached_or_fetch(f"{API_BASE}/anime/animasu/completed?page={page}", f"completed_{page}", cache_type='short')
-    return render_template("browse.html", data=data, page=page,
-                           title="Anime Completed", active="completed")
-
+    return render_template("browse.html", data=data, page=page, title="Anime Completed", active="completed")
 
 @app.route("/latest")
 def latest():
     page = request.args.get("page", 1, type=int)
     data = get_cached_or_fetch(f"{API_BASE}/anime/animasu/latest?page={page}", f"latest_{page}", cache_type='short')
-    return render_template("browse.html", data=data, page=page,
-                           title="Update Terbaru", active="latest")
-
+    return render_template("browse.html", data=data, page=page, title="Update Terbaru", active="latest")
 
 @app.route("/popular")
 def popular():
     page = request.args.get("page", 1, type=int)
     data = get_cached_or_fetch(f"{API_BASE}/anime/animasu/popular?page={page}", f"popular_{page}", cache_type='short')
-    return render_template("browse.html", data=data, page=page,
-                           title="Anime Populer", active="popular")
-
+    return render_template("browse.html", data=data, page=page, title="Anime Populer", active="popular")
 
 @app.route("/movies")
 def movies():
@@ -160,19 +136,16 @@ def movies():
     data = get_cached_or_fetch(f"{API_BASE}/anime/animasu/movies?page={page}", f"movies_{page}", cache_type='short')
     return render_template("movies.html", data=data, page=page, active="movies")
 
-
 @app.route("/animelist")
 def animelist():
     page = request.args.get("page", 1, type=int)
     data = get_cached_or_fetch(f"{API_BASE}/anime/animasu/animelist?page={page}", f"animelist_{page}", cache_type='long')
     return render_template("animelist.html", data=data, page=page, active="animelist")
 
-
 @app.route("/genre")
 def genres():
     data = get_cached_or_fetch(f"{API_BASE}/anime/animasu/genres", "genres", cache_type='long')
     return render_template("genres.html", data=data, active="genre")
-
 
 @app.route("/genre/<slug>")
 def genre_detail(slug):
@@ -181,12 +154,10 @@ def genre_detail(slug):
     return render_template("browse.html", data=data, page=page,
                            title=f"Genre: {slug.replace('-', ' ').title()}", active="genre")
 
-
 @app.route("/schedule")
 def schedule():
     data = get_cached_or_fetch(f"{API_BASE}/anime/animasu/schedule", "schedule", cache_type='long')
     return render_template("schedule.html", data=data, active="schedule")
-
 
 @app.route("/search")
 def search():
@@ -199,35 +170,26 @@ def search():
             data = response.json()
         except Exception as e:
             data = {"status": "error", "message": str(e)}
-    return render_template("search.html", data=data, keyword=keyword,
-                           page=page, active="search")
-
+    return render_template("search.html", data=data, keyword=keyword, page=page, active="search")
 
 @app.route("/anime/<slug>")
 def anime_detail(slug):
     data = get_cached_or_fetch(f"{API_BASE}/anime/animasu/detail/{slug}", f"detail_{slug}", cache_type='medium')
     return render_template("detail.html", data=data, slug=slug, active="")
 
-
 @app.route("/watch/<slug>")
 def watch(slug):
     import re
     data = get_cached_or_fetch(f"{API_BASE}/anime/animasu/episode/{slug}", f"episode_{slug}", cache_type='long')
-
     anime_slug = ""
     if data and isinstance(data, dict):
         anime_slug = (
-            data.get("animeId") or
-            data.get("anime_id") or
-            data.get("anime_slug") or
-            (data.get("detail", {}) or {}).get("animeId", "") or
-            ""
+            data.get("animeId") or data.get("anime_id") or data.get("anime_slug") or
+            (data.get("detail", {}) or {}).get("animeId", "") or ""
         )
-
     if not anime_slug:
         anime_slug = re.sub(r"^nonton-", "", slug)
         anime_slug = re.sub(r"-episode-\d+.*$", "", anime_slug)
-
     anime_poster = ""
     anime_title = ""
     try:
@@ -243,13 +205,9 @@ def watch(slug):
                 anime_title = d.get("title") or ""
     except Exception:
         pass
-
     return render_template("watch.html", data=data, slug=slug,
-                           anime_slug=anime_slug,
-                           anime_poster=anime_poster,
-                           anime_title=anime_title,
-                           active="")
-
+                           anime_slug=anime_slug, anime_poster=anime_poster,
+                           anime_title=anime_title, active="")
 
 @app.route("/watchlist")
 def watchlist():
@@ -270,7 +228,7 @@ def service_worker():
     return response
 
 
-# ─── Helper: extract schedule dari berbagai struktur API ─
+# ─── Helper ──────────────────────────────────────────────
 
 def extract_schedule(d):
     if not isinstance(d, dict):
@@ -286,7 +244,7 @@ def extract_schedule(d):
     return {}
 
 
-# ─── API: Schedule untuk SW background check ────────────
+# ─── API Endpoints ───────────────────────────────────────
 
 @app.route("/api/schedule-notif")
 def api_schedule_notif():
@@ -295,27 +253,14 @@ def api_schedule_notif():
         subs = json.loads(subs_raw)
     except Exception:
         subs = []
+    schedule_data = get_cached_or_fetch(f"{API_BASE}/anime/animasu/schedule", "schedule", cache_type='long')
+    return jsonify({"subs": subs, "schedule": extract_schedule(schedule_data)})
 
-    schedule_data = get_cached_or_fetch(
-        f"{API_BASE}/anime/animasu/schedule",
-        "schedule",
-        cache_type='long'
-    )
-
-    return jsonify({
-        "subs": subs,
-        "schedule": extract_schedule(schedule_data)
-    })
-
-
-# ─── Debug Endpoint ──────────────────────────────────────
 
 @app.route("/api/debug/schedule")
 def debug_schedule():
     import datetime
-    schedule_data = get_cached_or_fetch(
-        f"{API_BASE}/anime/animasu/schedule", "schedule", cache_type="long"
-    )
+    schedule_data = get_cached_or_fetch(f"{API_BASE}/anime/animasu/schedule", "schedule", cache_type="long")
     schedule = extract_schedule(schedule_data)
     now_wib = datetime.datetime.utcnow() + datetime.timedelta(hours=7)
     today = now_wib.strftime("%A").lower()
@@ -325,7 +270,6 @@ def debug_schedule():
     return jsonify({
         "utc_time": datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
         "wib_time": now_wib.strftime("%Y-%m-%d %H:%M:%S"),
-        "today_en": today,
         "today_id": today_id,
         "schedule_keys": list(schedule.keys()),
         "todays_anime_count": len([a for day, animes in schedule.items()
@@ -333,8 +277,6 @@ def debug_schedule():
                                    for a in animes])
     })
 
-
-# ─── Web Push API Endpoints ──────────────────────────────
 
 @app.route("/api/push/vapid-public-key")
 def push_vapid_key():
@@ -352,8 +294,7 @@ def push_subscribe():
     if not all([endpoint, p256dh, auth]):
         return jsonify({"error": "Missing fields"}), 400
     supabase_req("DELETE", "push_subscriptions", params={"endpoint": f"eq.{endpoint}"})
-    supabase_req("POST", "push_subscriptions",
-                 body={"endpoint": endpoint, "p256dh": p256dh, "auth": auth})
+    supabase_req("POST", "push_subscriptions", body={"endpoint": endpoint, "p256dh": p256dh, "auth": auth})
     return jsonify({"status": "ok"})
 
 
@@ -376,12 +317,10 @@ def push_send_schedule():
         if not subs or not isinstance(subs, list):
             return jsonify({"status": "no subscribers"})
 
-        schedule_data = get_cached_or_fetch(
-            f"{API_BASE}/anime/animasu/schedule", "schedule", cache_type="long"
-        )
+        schedule_data = get_cached_or_fetch(f"{API_BASE}/anime/animasu/schedule", "schedule", cache_type="long")
         schedule = extract_schedule(schedule_data)
 
-        # ✅ Pakai waktu WIB (UTC+7)
+        # Pakai waktu WIB (UTC+7)
         now_wib = datetime.datetime.utcnow() + datetime.timedelta(hours=7)
         today = now_wib.strftime("%A").lower()
         today_date = now_wib.date().isoformat()
@@ -398,11 +337,7 @@ def push_send_schedule():
                 todays_anime.extend(animes)
 
         if not todays_anime:
-            return jsonify({
-                "status": "no anime today",
-                "today_wib": today_id,
-                "schedule_keys": list(schedule.keys())
-            })
+            return jsonify({"status": "no anime today", "today_wib": today_id, "schedule_keys": list(schedule.keys())})
 
         already_sent_raw = supabase_req("GET", "notif_sent", params={
             "select": "anime_slug",
@@ -418,6 +353,7 @@ def push_send_schedule():
 
         sent = 0
         failed = 0
+        errors = []
         newly_sent_slugs = []
 
         for sub in subs:
@@ -443,27 +379,35 @@ def push_send_schedule():
                     if slug and slug not in newly_sent_slugs:
                         newly_sent_slugs.append(slug)
                 except WebPushException as e:
-                    if "410" in str(e) or "404" in str(e):
+                    err_msg = str(e)
+                    errors.append(f"WebPushException [{anime.get('slug')}]: {err_msg}")
+                    if "410" in err_msg or "404" in err_msg:
                         supabase_req("DELETE", "push_subscriptions",
                                      params={"endpoint": f"eq.{sub['endpoint']}"})
                     failed += 1
-                except Exception:
+                except Exception as e:
+                    errors.append(f"Exception [{anime.get('slug')}]: {str(e)}")
                     failed += 1
 
         for slug in newly_sent_slugs:
             try:
-                supabase_req("POST", "notif_sent",
-                             body={"anime_slug": slug, "sent_date": today_date})
+                supabase_req("POST", "notif_sent", body={"anime_slug": slug, "sent_date": today_date})
             except Exception:
                 pass
 
-        return jsonify({"status": "ok", "sent": sent, "failed": failed, "new_anime": len(new_anime)})
+        return jsonify({
+            "status": "ok",
+            "sent": sent,
+            "failed": failed,
+            "new_anime": len(new_anime),
+            "errors": errors[:5]  # tampilkan max 5 error pertama
+        })
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-# ─── AJAX Endpoints ─────────────────────────────────────
+# ─── AJAX ────────────────────────────────────────────────
 
 @app.route("/api/search")
 def api_search():
