@@ -12,8 +12,8 @@ app.secret_key = 'sakura-id-secret'
 # Supabase & Web Push Config
 SUPABASE_URL      = os.environ.get('SUPABASE_URL', '')
 SUPABASE_KEY      = os.environ.get('SUPABASE_KEY', '')
-VAPID_PUBLIC_KEY  = os.environ.get('VAPID_PUBLIC_KEY_1', '') + os.environ.get('VAPID_PUBLIC_KEY_2', '')
-VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
+VAPID_PUBLIC_KEY  = "BGJLPB6bAtAMW05nqxt_LywHfEbsD85W2QZLGYlpjgVMNxqiEwfzMlow3fxdDtmq_iQQ6rjvLno2JKc0aDhPopw"
+VAPID_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgy/2ZqvB152EOc8My\npt2iXlCsUo49MwDGhSJMj9zs3e6hRANCAARiSzwemwLQDFtOZ6sbfy8sB3xG7A/O\nVtkGSxmJaY4FTDcaohMH8zJaMN38XQ7Zqv4kEOq47y56NiSnNGg4T6Kc\n-----END PRIVATE KEY-----"
 VAPID_CLAIMS      = {"sub": "mailto:admin@sakura-id.vercel.app"}
 
 def supabase_req(method, path, body=None, params=None):
