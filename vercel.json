@@ -4,10 +4,6 @@
     {
       "src": "app.py",
       "use": "@vercel/python"
-    },
-    {
-      "src": "static/**",
-      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -18,6 +14,12 @@
     {
       "src": "/(.*)",
       "dest": "/app.py"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/push/send-schedule",
+      "schedule": "0 12 * * *"
     }
   ]
 }

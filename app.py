@@ -3,10 +3,37 @@ import requests
 import time
 import threading
 import os
+import json
 from collections import deque
 
 app = Flask(__name__)
 app.secret_key = 'sakura-id-secret'
+
+# Supabase & Web Push Config
+SUPABASE_URL      = os.environ.get('SUPABASE_URL', '')
+SUPABASE_KEY      = os.environ.get('SUPABASE_KEY', '')
+VAPID_PUBLIC_KEY  = os.environ.get('VAPID_PUBLIC_KEY', '')
+VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
+VAPID_CLAIMS      = {"sub": "mailto:admin@sakura-id.vercel.app"}
+
+def supabase_req(method, path, body=None, params=None):
+    url = f"{SUPABASE_URL}/rest/v1/{path}"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
+    }
+    try:
+        resp = requests.request(method, url, headers=headers,
+                                json=body, params=params, timeout=10)
+        if resp.text:
+            try: return resp.json()
+            except: return {}
+        return {}
+    except Exception as e:
+        print(f"[Supabase] Error: {e}")
+        return {}
 
 API_BASE = "https://www.sankavollerei.com"
 
@@ -276,6 +303,103 @@ def api_schedule_notif():
         "schedule": schedule_data.get("data", schedule_data) if isinstance(schedule_data, dict) else {}
     })
 
+
+
+# Web Push API Endpoints
+
+@app.route("/api/push/vapid-public-key")
+def push_vapid_key():
+    return jsonify({"key": VAPID_PUBLIC_KEY})
+
+
+@app.route("/api/push/subscribe", methods=["POST"])
+def push_subscribe():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data"}), 400
+    endpoint = data.get("endpoint")
+    p256dh   = data.get("keys", {}).get("p256dh")
+    auth     = data.get("keys", {}).get("auth")
+    if not all([endpoint, p256dh, auth]):
+        return jsonify({"error": "Missing fields"}), 400
+    supabase_req("DELETE", "push_subscriptions", params={"endpoint": f"eq.{endpoint}"})
+    supabase_req("POST", "push_subscriptions",
+                 body={"endpoint": endpoint, "p256dh": p256dh, "auth": auth})
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/push/unsubscribe", methods=["POST"])
+def push_unsubscribe():
+    data = request.get_json()
+    endpoint = data.get("endpoint") if data else None
+    if endpoint:
+        supabase_req("DELETE", "push_subscriptions", params={"endpoint": f"eq.{endpoint}"})
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/push/send-schedule", methods=["POST"])
+def push_send_schedule():
+    try:
+        from pywebpush import webpush, WebPushException
+        import datetime
+
+        subs = supabase_req("GET", "push_subscriptions", params={"select": "*"})
+        if not subs or not isinstance(subs, list):
+            return jsonify({"status": "no subscribers"})
+
+        schedule_data = get_cached_or_fetch(
+            f"{API_BASE}/anime/animasu/schedule", "schedule", cache_type="long"
+        )
+        schedule = schedule_data.get("data", {}) if isinstance(schedule_data, dict) else {}
+
+        today = datetime.datetime.now().strftime("%A").lower()
+        day_map = {
+            "monday": "senin", "tuesday": "selasa", "wednesday": "rabu",
+            "thursday": "kamis", "friday": "jumat", "saturday": "sabtu", "sunday": "minggu"
+        }
+        today_id = day_map.get(today, today)
+
+        todays_anime = []
+        for day, animes in schedule.items():
+            if isinstance(animes, list) and today_id in day.lower():
+                todays_anime.extend(animes)
+
+        if not todays_anime:
+            return jsonify({"status": "no anime today"})
+
+        sent = 0
+        failed = 0
+        for sub in subs:
+            for anime in todays_anime[:3]:
+                try:
+                    payload = json.dumps({
+                        "title": f"\U0001f338 Episode Baru: {anime.get('title', '')}",
+                        "body": "Tayang hari ini! Klik untuk nonton sekarang.",
+                        "icon": anime.get("poster", "/static/img/sakura-icon.png"),
+                        "url": f"/anime/{anime.get('slug', '')}"
+                    })
+                    webpush(
+                        subscription_info={
+                            "endpoint": sub["endpoint"],
+                            "keys": {"p256dh": sub["p256dh"], "auth": sub["auth"]}
+                        },
+                        data=payload,
+                        vapid_private_key=VAPID_PRIVATE_KEY,
+                        vapid_claims=VAPID_CLAIMS
+                    )
+                    sent += 1
+                except WebPushException as e:
+                    if "410" in str(e) or "404" in str(e):
+                        supabase_req("DELETE", "push_subscriptions",
+                                     params={"endpoint": f"eq.{sub['endpoint']}"})
+                    failed += 1
+                except Exception:
+                    failed += 1
+
+        return jsonify({"status": "ok", "sent": sent, "failed": failed})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # ─── AJAX Endpoints ─────────────────────────────────────
 
