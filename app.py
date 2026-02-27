@@ -12,7 +12,8 @@ app.secret_key = 'sakura-id-secret'
 # Supabase & Web Push Config
 SUPABASE_URL      = os.environ.get('SUPABASE_URL', '')
 SUPABASE_KEY      = os.environ.get('SUPABASE_KEY', '')
-VAPID_PUBLIC_KEY  = os.environ.get('VAPID_PUBLIC_KEY', '')
+# VAPID key disimpan dalam 2 bagian karena Vercel memotong string panjang
+VAPID_PUBLIC_KEY  = os.environ.get('VAPID_PUBLIC_KEY_1', '') + os.environ.get('VAPID_PUBLIC_KEY_2', '')
 VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
 VAPID_CLAIMS      = {"sub": "mailto:admin@sakura-id.vercel.app"}
 
