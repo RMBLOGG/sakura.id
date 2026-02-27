@@ -49,26 +49,19 @@ HEADERS = {
 
 # ============================================================
 # CACHE SYSTEM
-# Durasi cache berbeda tiap jenis konten:
-#   - List/home/ongoing : 10 menit (konten sering update)
-#   - Detail anime      : 30 menit (jarang berubah)
-#   - Episode detail    : 60 menit (hampir tidak berubah)
-#   - Schedule/genres   : 60 menit
 # ============================================================
 cache_store = {}
 CACHE_DURATION = {
-    'short':  600,   # 10 menit  - list, home, recent
-    'medium': 1800,  # 30 menit  - detail anime
-    'long':   3600,  # 60 menit  - episode, schedule, genres
+    'short':  600,
+    'medium': 1800,
+    'long':   3600,
 }
 
-# Rate limiter: maks 60 req/menit (aman di bawah limit 70)
 _request_lock = threading.Lock()
 _request_times = []
 MAX_REQUESTS_PER_MINUTE = 60
 
 def _wait_for_rate_limit():
-    """Pastikan tidak melebihi 60 request per menit"""
     with _request_lock:
         now = time.time()
         while _request_times and now - _request_times[0] > 60:
@@ -80,11 +73,9 @@ def _wait_for_rate_limit():
         _request_times.append(time.time())
 
 def get_cached_or_fetch(url, cache_key, timeout=15, cache_type='short'):
-    """Ambil dari cache atau fetch dari API dengan rate limit protection"""
     now = time.time()
     duration = CACHE_DURATION.get(cache_type, CACHE_DURATION['short'])
 
-    # Cek cache dulu
     if cache_key in cache_store:
         cached_data, timestamp = cache_store[cache_key]
         if now - timestamp < duration:
@@ -105,14 +96,13 @@ def get_cached_or_fetch(url, cache_key, timeout=15, cache_type='short'):
                 continue
             response.raise_for_status()
             data = response.json()
-            cache_store[cache_key] = (data, now)  # hanya cache kalau sukses
+            cache_store[cache_key] = (data, now)
             return data
         except Exception as e:
             last_error = e
             if attempt < 2:
                 time.sleep(2)
 
-    # Semua retry gagal - coba pakai stale cache
     if cache_key in cache_store:
         print(f"⚠️ Pakai stale cache: {cache_key}")
         return cache_store[cache_key][0]
@@ -204,7 +194,6 @@ def search():
     page = request.args.get("page", 1, type=int)
     data = None
     if keyword:
-        # Search tidak di-cache (query unik tiap user)
         try:
             response = requests.get(f"{API_BASE}/anime/animasu/search/{keyword}?page={page}", headers=HEADERS, timeout=10)
             data = response.json()
@@ -281,14 +270,28 @@ def service_worker():
     return response
 
 
+# ─── Helper: extract schedule dari berbagai struktur API ─
+
+def extract_schedule(d):
+    if not isinstance(d, dict):
+        return {}
+    for key in ["schedule", "data"]:
+        val = d.get(key)
+        if isinstance(val, dict):
+            if any(k in val for k in ["senin","selasa","rabu","kamis","jumat","sabtu","minggu"]):
+                return val
+            inner = val.get("schedule") or val.get("data")
+            if isinstance(inner, dict):
+                return inner
+    return {}
+
+
 # ─── API: Schedule untuk SW background check ────────────
 
 @app.route("/api/schedule-notif")
 def api_schedule_notif():
-    """Endpoint untuk Service Worker cek jadwal di background"""
     subs_raw = request.args.get("subs", "[]")
     try:
-        import json
         subs = json.loads(subs_raw)
     except Exception:
         subs = []
@@ -301,12 +304,37 @@ def api_schedule_notif():
 
     return jsonify({
         "subs": subs,
-        "schedule": (lambda d: next((d.get(k) for k in ["schedule","data"] if isinstance(d.get(k),dict) and any(x in d.get(k) for x in ["senin","sabtu","minggu"])), d.get("schedule", d.get("data", {}))))(schedule_data) if isinstance(schedule_data, dict) else {}
+        "schedule": extract_schedule(schedule_data)
     })
 
 
+# ─── Debug Endpoint ──────────────────────────────────────
 
-# Web Push API Endpoints
+@app.route("/api/debug/schedule")
+def debug_schedule():
+    import datetime
+    schedule_data = get_cached_or_fetch(
+        f"{API_BASE}/anime/animasu/schedule", "schedule", cache_type="long"
+    )
+    schedule = extract_schedule(schedule_data)
+    now_wib = datetime.datetime.utcnow() + datetime.timedelta(hours=7)
+    today = now_wib.strftime("%A").lower()
+    day_map = {"monday":"senin","tuesday":"selasa","wednesday":"rabu",
+               "thursday":"kamis","friday":"jumat","saturday":"sabtu","sunday":"minggu"}
+    today_id = day_map.get(today, today)
+    return jsonify({
+        "utc_time": datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        "wib_time": now_wib.strftime("%Y-%m-%d %H:%M:%S"),
+        "today_en": today,
+        "today_id": today_id,
+        "schedule_keys": list(schedule.keys()),
+        "todays_anime_count": len([a for day, animes in schedule.items()
+                                   if isinstance(animes, list) and today_id in day.lower()
+                                   for a in animes])
+    })
+
+
+# ─── Web Push API Endpoints ──────────────────────────────
 
 @app.route("/api/push/vapid-public-key")
 def push_vapid_key():
@@ -351,27 +379,13 @@ def push_send_schedule():
         schedule_data = get_cached_or_fetch(
             f"{API_BASE}/anime/animasu/schedule", "schedule", cache_type="long"
         )
-        # Handle semua kemungkinan struktur API:
-        # 1. {"schedule": {"schedule": {"sabtu": [...]}}}
-        # 2. {"schedule": {"sabtu": [...]}}
-        # 3. {"data": {"sabtu": [...]}}
-        def extract_schedule(d):
-            if not isinstance(d, dict):
-                return {}
-            for key in ["schedule", "data"]:
-                val = d.get(key)
-                if isinstance(val, dict):
-                    # Cek apakah ini langsung berisi hari-hari
-                    if any(k in val for k in ["senin","selasa","rabu","kamis","jumat","sabtu","minggu"]):
-                        return val
-                    # Atau nested satu level lagi
-                    inner = val.get("schedule") or val.get("data")
-                    if isinstance(inner, dict):
-                        return inner
-            return {}
         schedule = extract_schedule(schedule_data)
 
-        today = datetime.datetime.now().strftime("%A").lower()
+        # ✅ Pakai waktu WIB (UTC+7)
+        now_wib = datetime.datetime.utcnow() + datetime.timedelta(hours=7)
+        today = now_wib.strftime("%A").lower()
+        today_date = now_wib.date().isoformat()
+
         day_map = {
             "monday": "senin", "tuesday": "selasa", "wednesday": "rabu",
             "thursday": "kamis", "friday": "jumat", "saturday": "sabtu", "sunday": "minggu"
@@ -384,10 +398,12 @@ def push_send_schedule():
                 todays_anime.extend(animes)
 
         if not todays_anime:
-            return jsonify({"status": "no anime today"})
+            return jsonify({
+                "status": "no anime today",
+                "today_wib": today_id,
+                "schedule_keys": list(schedule.keys())
+            })
 
-        # Cek anime mana yang belum dikirim notifnya hari ini
-        today_date = datetime.date.today().isoformat()
         already_sent_raw = supabase_req("GET", "notif_sent", params={
             "select": "anime_slug",
             "sent_date": f"eq.{today_date}"
@@ -396,7 +412,6 @@ def push_send_schedule():
         if isinstance(already_sent_raw, list):
             already_sent = {r["anime_slug"] for r in already_sent_raw}
 
-        # Filter hanya anime yang belum dikirim hari ini
         new_anime = [a for a in todays_anime if a.get("slug") not in already_sent]
         if not new_anime:
             return jsonify({"status": "already sent today", "sent": 0})
@@ -435,7 +450,6 @@ def push_send_schedule():
                 except Exception:
                     failed += 1
 
-        # Simpan anime yang sudah dikirim notifnya hari ini ke Supabase
         for slug in newly_sent_slugs:
             try:
                 supabase_req("POST", "notif_sent",
@@ -447,6 +461,7 @@ def push_send_schedule():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 # ─── AJAX Endpoints ─────────────────────────────────────
 
