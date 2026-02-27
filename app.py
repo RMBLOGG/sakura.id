@@ -301,7 +301,7 @@ def api_schedule_notif():
 
     return jsonify({
         "subs": subs,
-        "schedule": schedule_data.get("data", schedule_data) if isinstance(schedule_data, dict) else {}
+        "schedule": schedule_data.get("schedule", {}).get("schedule", schedule_data.get("schedule", {})) if isinstance(schedule_data, dict) else {}
     })
 
 
@@ -351,7 +351,8 @@ def push_send_schedule():
         schedule_data = get_cached_or_fetch(
             f"{API_BASE}/anime/animasu/schedule", "schedule", cache_type="long"
         )
-        schedule = schedule_data.get("data", {}) if isinstance(schedule_data, dict) else {}
+        raw = schedule_data.get("schedule", {}) if isinstance(schedule_data, dict) else {}
+        schedule = raw.get("schedule", raw) if isinstance(raw, dict) else {}
 
         today = datetime.datetime.now().strftime("%A").lower()
         day_map = {
