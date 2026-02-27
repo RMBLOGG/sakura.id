@@ -27,6 +27,13 @@ def rate_limit_wait():
         _req_times.append(time.time())
 
 
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Referer": API_BASE,
+}
+
 def api_get(path):
     with _cache_lock:
         if path in _cache:
@@ -35,15 +42,19 @@ def api_get(path):
                 return data
 
     rate_limit_wait()
-    try:
-        resp = requests.get(f"{API_BASE}{path}", timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-        with _cache_lock:
-            _cache[path] = (data, time.time())
-        return data
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    last_err = None
+    for attempt in range(2):  # retry 1x kalau gagal
+        try:
+            resp = requests.get(f"{API_BASE}{path}", timeout=15, headers=HEADERS)
+            resp.raise_for_status()
+            data = resp.json()
+            with _cache_lock:
+                _cache[path] = (data, time.time())  # hanya cache kalau sukses
+            return data
+        except Exception as e:
+            last_err = e
+            time.sleep(1)  # tunggu 1 detik sebelum retry
+    return {"status": "error", "message": str(last_err)}
 
 
 # ─── Routes ─────────────────────────────────────────────
